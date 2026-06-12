@@ -1,0 +1,31 @@
+# --- Vivado: GUI Junk & Synthesis Artifacts ---
+*.jou
+*.log
+*.pb
+*.str
+*.backup.tcl
+.Xil/
+hd_visual/
+NA/
+
+# --- Build Directories ---
+# We ignore the entire build folder where you run your make.tcl
+build/
+
+# --- Vitis / Eclipse: Software Development ---
+# Ignore the entire workspace because we regenerate it via build_sw.tcl
+software/workspace/
+
+# Vitis specific logs and metadata
+software/*.log
+software/xrc.log
+IDE.log
+.metadata/
+.analytics/
+RemoteSystemsTempFiles/
+*.bak
+
+# --- System & Editors ---
+.vscode/
+.idea/
+.DS_Store
