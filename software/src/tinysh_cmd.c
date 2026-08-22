@@ -394,6 +394,10 @@ void phase_shifting_test_all_fnt(int argc, char **argv)
  *              - argv[2] – liczba punktów sweepu (points >= 2).
  * @param argv  Tablica argumentów.
  */
+
+//#define STATS_POINTS 0x10000; // 64kB(64*1024) zboczy
+#define STATS_POINTS 128; 
+
 void phase_shifting_dac_sweep_auto_fnt(int argc, char **argv)
 {
     if (argc < 3) {
@@ -409,9 +413,9 @@ void phase_shifting_dac_sweep_auto_fnt(int argc, char **argv)
         return;
     }
 
-    u32 count_limit = 0x10000; // 64kB(64*1024) zboczy
+    u32 count_limit = STATS_POINTS;
     u32 step = 65535 / (points - 1);
-
+// RANGE==DAC_RANGE POINTS==DAC_POINTS
     printf("\n#COUNT=%u,DAC_SWEEP,CH=%u,POINTS=%u,RANGE=0..65535,STEP=%u (~%.3f mV)\n",
     		count_limit,chn, points, step, (double)step * 10.0 / 65535.0 * 1000.0);
 

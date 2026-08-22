@@ -51,7 +51,7 @@
 #include "spi_ctrl.h"
 #include "tinysh.h"
 #include "tinysh_cmd.h"
-#include "xuartns550_l.h"
+//#include "xuartns550_l.h"
 #include "axi_timer_sleep.h"
 #include "xspi_l.h"
 #include "xparameters.h"
@@ -78,7 +78,7 @@ int main()
 	while(1)
 	{
 	   unsigned char c;
-	   c=XUartNs550_RecvByte(STDIN_BASEADDRESS); /* we assume this fnt is blocking */
+	   c=XUartNs550_RecvByte(XPAR_AXI_UART16550_1_BASEADDR); /* we assume this fnt is blocking */
 	   tinysh_char_in(c);
 	}
 
