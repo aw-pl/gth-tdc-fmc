@@ -5,13 +5,19 @@ set_property IOSTANDARD DIFF_SSTL15 [get_ports fpga_clk1_p]
 set_property PACKAGE_PIN AF9 [get_ports fpga_clk1_p]
 set_property PACKAGE_PIN AG9 [get_ports fpga_clk1_n]
 set_property IOSTANDARD DIFF_SSTL15 [get_ports fpga_clk1_n]
+
+# ===============================
+# Clocks - AFCKU
+# ===============================
+# not used since duplicated constraint by CLKWIZ
 # 125 MHz default clock
-create_clock -period 8.000 -name fpga_clk1_p [get_ports fpga_clk1_p]
-set_property PACKAGE_PIN F20 [get_ports LED_LR]
-set_property IOSTANDARD LVCMOS18 [get_ports LED_LR]
+#create_clock -period 8.000 -name fpga_clk1_p [get_ports fpga_clk1_p]
 # ===============================
 # Clocks - FMC
 # ===============================
+create_clock -period 6.400 -name GBTCLK0_M2C_P -waveform {0.000 3.200} [get_ports GBTCLK0_M2C_P]
+
+set_clock_groups -name axi_gth_async_group -asynchronous -group [get_clocks -of_objects [get_pins design_1_i/clk_wiz_0/inst/mmcme3_adv_inst/CLKOUT0]] -group [get_clocks -of_objects [get_pins design_1_i/gth_wrapper_0/U0/u_gtwizard_ultrascale_0/inst/gen_gtwizard_gthe3_top.gtwizard_ultrascale_0_gtwizard_gthe3_inst/gen_gtwizard_gthe3.gen_rx_user_clocking_internal.gen_single_instance.gtwiz_userclk_rx_inst/gen_gtwiz_userclk_rx_main.bufg_gt_usrclk2_inst/O]]
 
 # ===============================
 # TDC-GTH - valid
@@ -90,10 +96,6 @@ set_property IOSTANDARD LVCMOS18 [get_ports {PLL_CTRL_tri_io[0]}]
 # SYNCSE
 # ===============================
 #C11 HB07_P -> !SYNCSE
-set_property PACKAGE_PIN C11 [get_ports SYNCSE]
-set_property IOSTANDARD LVCMOS18 [get_ports SYNCSE]
-set_property SLEW FAST [get_ports SYNCSE]
-set_property DRIVE 16 [get_ports SYNCSE]
 # ===============================
 # ADC CONTROL - valid
 # ===============================
@@ -108,16 +110,6 @@ set_property PACKAGE_PIN E10 [get_ports {gpio_o_adc_ctrl[0]}]
 set_property PACKAGE_PIN F8 [get_ports {gpio_o_adc_ctrl[1]}]
 set_property IOSTANDARD LVCMOS18 [get_ports {gpio_o_adc_ctrl[1]}]
 set_property IOSTANDARD LVCMOS18 [get_ports {gpio_o_adc_ctrl[0]}]
-set_property PACKAGE_PIN D9 [get_ports {gpio_i_adc_ctrl[0]}]
-set_property PACKAGE_PIN J8 [get_ports {gpio_i_adc_ctrl[1]}]
-set_property PACKAGE_PIN L12 [get_ports {gpio_i_adc_ctrl[2]}]
-set_property PACKAGE_PIN L13 [get_ports {gpio_i_adc_ctrl[3]}]
-set_property PACKAGE_PIN K10 [get_ports {gpio_i_adc_ctrl[4]}]
-set_property IOSTANDARD LVCMOS18 [get_ports {gpio_i_adc_ctrl[4]}]
-set_property IOSTANDARD LVCMOS18 [get_ports {gpio_i_adc_ctrl[3]}]
-set_property IOSTANDARD LVCMOS18 [get_ports {gpio_i_adc_ctrl[2]}]
-set_property IOSTANDARD LVCMOS18 [get_ports {gpio_i_adc_ctrl[1]}]
-set_property IOSTANDARD LVCMOS18 [get_ports {gpio_i_adc_ctrl[0]}]
 # ===============================
 # IIC - valid
 # ===============================
@@ -477,6 +469,7 @@ set_property IOSTANDARD LVCMOS18 [get_ports SPI_ADC_sck_io]
 set_property PACKAGE_PIN B15 [get_ports {PLL_CTRL_tri_io[0]}]
 
 #create_clock -period 6.400 -name gth_clk_out -waveform {0.000 3.200} [get_pins {design_1_i/gth_wrapper_0/gtwiz_userclk_rx_usrclk2_out[0]}]
+
 set_property C_CLK_INPUT_FREQ_HZ 300000000 [get_debug_cores dbg_hub]
 set_property C_ENABLE_CLK_DIVIDER false [get_debug_cores dbg_hub]
 set_property C_USER_SCAN_CHAIN 1 [get_debug_cores dbg_hub]

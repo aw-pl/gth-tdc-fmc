@@ -4,12 +4,16 @@ use IEEE.NUMERIC_STD.ALL;
 library UNISIM;
 use UNISIM.VComponents.all;
 
+Library xpm;
+use xpm.vcomponents.all;
+
 entity channel_diff_stat is
     generic (
         channel_width : integer := 80
     );
     port (
         clk     : in  std_logic;
+        aclk    : in  std_logic;
         resetn  : in  std_logic;
         en       : in std_logic;
 
@@ -37,14 +41,40 @@ entity channel_diff_stat is
         ch4_pos  : out std_logic_vector(8 downto 0);
         ch5_pos  : out std_logic_vector(8 downto 0);
         ch6_pos  : out std_logic_vector(8 downto 0);
-        
-        
+ 
+        -- diff stats
         ch01_diff  : out std_logic_vector(8 downto 0);
         ch02_diff  : out std_logic_vector(8 downto 0);
         ch03_diff  : out std_logic_vector(8 downto 0);
         ch04_diff  : out std_logic_vector(8 downto 0);
         ch05_diff  : out std_logic_vector(8 downto 0);
-        ch06_diff  : out std_logic_vector(8 downto 0)
+        ch06_diff  : out std_logic_vector(8 downto 0);
+        
+        -- min/max stats
+        ch_hist_idle : in std_logic;
+        ch_hist_finished : in std_logic;
+        
+        ch01_min  : out std_logic_vector(8 downto 0);        
+        ch02_min  : out std_logic_vector(8 downto 0);
+        ch03_min  : out std_logic_vector(8 downto 0);
+        ch04_min  : out std_logic_vector(8 downto 0);
+        ch05_min  : out std_logic_vector(8 downto 0);
+        ch06_min  : out std_logic_vector(8 downto 0);
+
+        ch01_max  : out std_logic_vector(8 downto 0); 
+        ch02_max  : out std_logic_vector(8 downto 0); 
+        ch03_max  : out std_logic_vector(8 downto 0); 
+        ch04_max  : out std_logic_vector(8 downto 0); 
+        ch05_max  : out std_logic_vector(8 downto 0); 
+        ch06_max  : out std_logic_vector(8 downto 0); 
+       
+        ch01_minmax  : out std_logic_vector(31 downto 0);        
+        ch02_minmax  : out std_logic_vector(31 downto 0);
+        ch03_minmax  : out std_logic_vector(31 downto 0);
+        ch04_minmax  : out std_logic_vector(31 downto 0);
+        ch05_minmax  : out std_logic_vector(31 downto 0);
+        ch06_minmax  : out std_logic_vector(31 downto 0)
+        
     );
 end channel_diff_stat;
 
@@ -104,8 +134,22 @@ architecture Behavioral of channel_diff_stat is
     signal ch_diff_04 : std_logic_vector(8 downto 0);
     signal ch_diff_05 : std_logic_vector(8 downto 0);
     signal ch_diff_06 : std_logic_vector(8 downto 0);
-
+    
     signal diff_valid_int : std_logic;
+    signal resetn_sync : std_logic;    
+    signal en_sync: std_logic;
+    
+    -- min/max section
+    constant NUM_SIGNALS : integer := 6;
+
+    type data_array_t is array (0 to NUM_SIGNALS-1)
+        of signed(8 downto 0);
+        --of integer range -256 to 255;  
+        
+    signal pos_array : data_array_t;
+    signal min_reg   : data_array_t;
+    signal max_reg   : data_array_t;
+    
 begin
 
 
@@ -131,8 +175,58 @@ begin
     ch_diff_04 <= diff(pos0, pos4);
     ch_diff_05 <= diff(pos0, pos5);
     ch_diff_06 <= diff(pos0, pos6);
+    
+    -- mapping min/max array
+--    pos_array <= (
+--        0 => pos0,
+--        1 => pos1,
+--        2 => pos2,
+--        3 => pos3,
+--        4 => pos4,
+--        5 => pos5,
+--        6 => pos6   
+--    );
 
-    main : process(clk, resetn)
+    pos_array <= (
+        0 => signed(ch_diff_01), -- or ch01_diff
+        1 => signed(ch_diff_02),
+        2 => signed(ch_diff_03),
+        3 => signed(ch_diff_04),
+        4 => signed(ch_diff_05),
+        5 => signed(ch_diff_06)                
+    );    
+    
+   -- sync reset
+--   xpm_cdc_async_rst_inst : xpm_cdc_async_rst
+--   generic map (
+--      DEST_SYNC_FF => 2,    -- DECIMAL; range: 2-10
+--      INIT_SYNC_FF => 0,    -- DECIMAL; 0=disable simulation init values, 1=enable simulation init values
+--      RST_ACTIVE_HIGH => 0  -- DECIMAL; 0=active low reset, 1=active high reset
+--   )
+--   port map (
+--      dest_arst => resetn_sync, -- 1-bit output: src_arst asynchronous reset signal synchronized to destination
+--                              -- clock domain. This output is registered. NOTE: Signal asserts asynchronously
+--                              -- but deasserts synchronously to dest_clk. Width of the reset signal is at least
+--                              -- (DEST_SYNC_FF*dest_clk) period.
+
+--      dest_clk => clk,   -- 1-bit input: Destination clock.
+--      src_arst => resetn    -- 1-bit input: Source asynchronous reset signal.
+--   );
+
+    xpm_cdc_en : xpm_cdc_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1
+    )
+    port map (
+        src_clk  => aclk, 
+        src_in   => en,
+        dest_clk => clk,
+        dest_out => en_sync
+    );
+    
+   -- main : process(clk, resetn)
+   main : process(clk)
 
     begin
         if rising_edge(clk) then
@@ -170,8 +264,21 @@ begin
                 ch03_diff <= (others =>'0');
                 ch04_diff <= (others =>'0');
                 ch05_diff <= (others =>'0');
-                ch06_diff <= (others =>'0');
+                ch06_diff <= (others =>'0');   
+                
+                for i in 0 to NUM_SIGNALS-1 loop
+                    min_reg(i) <= to_signed(255, 9); --   255;
+                    max_reg(i) <= to_signed(-256, 9); -- -256;                    
+                end loop;
+                
             else
+                -- we reset module since its not measuring
+                if (ch_hist_idle = '1') then
+                    for i in 0 to NUM_SIGNALS-1 loop
+                        min_reg(i) <= to_signed(255, 9); --   255;
+                        max_reg(i) <= to_signed(-256, 9); -- -256;                    
+                    end loop;
+                end if;
                 
                 chn_storage0 <= ch0;
                 chn_storage1 <= ch1;
@@ -205,18 +312,76 @@ begin
                 ch05_diff <= ch_diff_05;
                 ch06_diff <= ch_diff_06;
 
-
                 if ((pos0 > 0) and (pos1 > 0) and (pos2 > 0) and
-                (pos3 > 0) and (pos4 > 0) and (pos5 > 0) and (pos6 > 0)) and en = '1' and diff_valid_int='0' then
+                    (pos3 > 0) and (pos4 > 0) and (pos5 > 0) and (pos6 > 0)) 
+                    and en_sync = '1' and diff_valid_int='0' then
                     diff_valid_int <= '1';
+                    
+                    -- works only if histograms are working, so from channel hist we take 
+                    -- IDLE as reset
+                    -- FINISHED as done
+                    if (ch_hist_finished = '0') then
+                        -- storing min/max values of the DIFF (since position will always be different)
+                        -- assuming that pos values are always expected to be the same                
+                        for i in 0 to NUM_SIGNALS-1 loop
+                            --if pos_array(i) < min_reg(i) and pos_array(i) /= 0 then
+                            if pos_array(i) < min_reg(i) then
+                                min_reg(i) <= pos_array(i);
+                            end if;
+                        
+                            --if pos_array(i) > max_reg(i) and pos_array(i) /= 0  then
+                            if pos_array(i) > max_reg(i) then
+                                max_reg(i) <= pos_array(i);
+                            end if;
+                        end loop;
+                     end if;
+                     
                 else
                     diff_valid_int <= '0';
                 end if;
 
             end if;
        
-        end if;
-    diff_valid <= diff_valid_int;
+        end if;   
     end process;
+    
+    diff_valid <= diff_valid_int;
+    
+--    -- mapping to output ports
+--    ch0_minmax <= std_logic_vector(resize(to_signed(max_reg(0), 9), 16)) &
+--                  std_logic_vector(resize(to_signed(min_reg(0), 9), 16));
+    ch01_minmax <= std_logic_vector(resize(max_reg(0), 16)) &
+                  std_logic_vector(resize (min_reg(0), 16));  
+                  
+    ch02_minmax <= std_logic_vector(resize(max_reg(1), 16)) &
+                   std_logic_vector(resize(min_reg(1), 16));
+                 
+    ch03_minmax <= std_logic_vector(resize(max_reg(2), 16)) &
+                  std_logic_vector(resize (min_reg(2), 16));
+                  
+    ch04_minmax <= std_logic_vector(resize(max_reg(3), 16)) &
+                  std_logic_vector(resize (min_reg(3), 16));  
+                                  
+    ch05_minmax <= std_logic_vector(resize(max_reg(4), 16)) &
+                  std_logic_vector(resize (min_reg(4), 16));
+                  
+    ch06_minmax <= std_logic_vector(resize(max_reg(5), 16)) &
+                  std_logic_vector(resize (min_reg(5), 16)); 
+                                   
+
+    ch01_min <= std_logic_vector(min_reg(0));
+    ch02_min <= std_logic_vector(min_reg(1)); 
+    ch03_min <= std_logic_vector(min_reg(2)); 
+    ch04_min <= std_logic_vector(min_reg(3)); 
+    ch05_min <= std_logic_vector(min_reg(4)); 
+    ch06_min <= std_logic_vector(min_reg(5)); 
+            
+    ch01_max <= std_logic_vector(max_reg(0));
+    ch02_max <= std_logic_vector(max_reg(1));  
+    ch03_max <= std_logic_vector(max_reg(2));  
+    ch04_max <= std_logic_vector(max_reg(3));  
+    ch05_max <= std_logic_vector(max_reg(4));  
+    ch06_max <= std_logic_vector(max_reg(5));  
+                   
 end Behavioral;
     

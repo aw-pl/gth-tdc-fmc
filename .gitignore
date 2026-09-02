@@ -15,6 +15,7 @@ build/
 # --- Vitis / Eclipse: Software Development ---
 # Ignore the entire workspace because we regenerate it via build_sw.tcl
 software/workspace/
+software/vitis_workspace/
 
 # Vitis specific logs and metadata
 software/*.log

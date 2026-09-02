@@ -38,11 +38,15 @@ entity channel_hist is
     clk   : in  std_logic;
     rstn   : in  std_logic;
 
-
+    -- gth stats signals
     gth_domain_clk : in std_logic;
     gth_valid_in : in std_logic;
     gth_diff_in : in std_logic_vector (8 downto 0); 
+    gth_minmax_in : in std_logic_vector (31 downto 0); 
     -- TODO: add outputs (e.g. histogram readback interface, status flags, etc.)
+    
+    ch_hist_idle : out std_logic;
+    ch_hist_finished : out std_logic;
 
     -- AXI4-Lite slave interface
     s_axi_awaddr  : in  std_logic_vector(31 downto 0);
@@ -87,13 +91,14 @@ signal gth_reg_sum : std_logic_vector(31 downto 0);
 signal gth_reg_base : std_logic_vector(31 downto 0);
 signal gth_reg_hist : signed_vector(0 to (N_HISTOGRAMS-1));
 
+signal gth_reg_minmax : std_logic_vector(31 downto 0);
+
 signal axi_reg_cfg : std_logic_vector(31 downto 0);
 signal axi_reg_status : std_logic_vector(31 downto 0);
 signal axi_reg_sum : std_logic_vector(31 downto 0);
 signal axi_reg_base : std_logic_vector(31 downto 0);
 signal axi_reg_hist : signed_vector(0 to (N_HISTOGRAMS-1));
-
-
+signal axi_reg_minmax : std_logic_vector(31 downto 0);
 
 signal axi_awready_int : std_logic := '0';
 signal axi_wready_int  : std_logic := '0';
@@ -106,6 +111,9 @@ signal axi_rresp_int   : std_logic_vector(1 downto 0) := (others => '0');
 
   -- synchronizers --
 signal rstn_cdc  : std_logic;
+
+signal w_ch_hist_idle     : std_logic := '0';
+signal w_ch_hist_finished : std_logic := '0';
 
 begin
 
@@ -169,6 +177,19 @@ begin
         dest_clk => clk,               -- AXI
         dest_out => axi_reg_sum
     );
+
+    xpm_cdc_minmax : xpm_cdc_array_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1,
+        WIDTH => 32
+    )
+    port map (
+        src_clk  => gth_domain_clk,    -- GTH
+        src_in   => gth_reg_minmax,
+        dest_clk => clk,               -- AXI
+        dest_out => axi_reg_minmax
+    );
     
     gen_hist_cdc : for i in 0 to N_HISTOGRAMS-1 generate
         signal lane_src : std_logic_vector(31 downto 0);
@@ -211,13 +232,16 @@ begin
   ----------------------------------------------------------------------------
     hist: process(gth_domain_clk) 
         variable hist_indx : integer range 0 to N_HISTOGRAMS-1;
-        variable chn_diff : integer range  (-N_HISTOGRAMS/2) to (N_HISTOGRAMS/2 -1);
+        -- we only check spread -8/+7 values with reference to lane0
+        variable chn_diff : integer range  (-N_HISTOGRAMS/2) to (N_HISTOGRAMS/2 -1); 
         variable local_sum : integer;
     begin
     
         if rising_edge(gth_domain_clk) then
             if rstn_cdc = '0' then
                 gth_reg_status <= (others => '0');
+                
+                gth_reg_minmax <= (others => '0');
 
                 for i in 0 to N_HISTOGRAMS-1 loop
                     gth_reg_hist(i) <= (others => '0');
@@ -254,6 +278,8 @@ begin
                             local_sum := local_sum + 1;
                             gth_reg_sum <= std_logic_vector(to_signed(local_sum, 32));
                         end if;
+                        
+                        gth_reg_minmax <= gth_minmax_in;
                     end if;
 
                     if to_unsigned(local_sum,32) >= unsigned(gth_reg_base) then
@@ -276,6 +302,29 @@ begin
         
     end process;
 
+    hist_status: process(gth_domain_clk)
+    begin    
+        if rising_edge(gth_domain_clk) then
+            if rstn_cdc = '0' then
+               w_ch_hist_idle <= '1';
+               w_ch_hist_finished <= '0';
+            else            
+                if (hist_state = IDLE) then
+                    w_ch_hist_idle <= '1';
+                else
+                    w_ch_hist_idle <= '0';
+                end if;               
+                if (hist_state = FINISH) then
+                    w_ch_hist_finished <= '1';
+                else
+                    w_ch_hist_finished <= '0';
+                end if;
+            end if;
+        end if;        
+    end process;
+    
+ch_hist_idle <= w_ch_hist_idle;
+ch_hist_finished <= w_ch_hist_finished;
 
   -- 2) AXI4-Lite slave logic
     axifsm :process(clk)
@@ -329,6 +378,8 @@ begin
                             axi_rdata_int <= axi_reg_sum;
                         elsif addr_index >= 4 and addr_index < (4+N_HISTOGRAMS) then
                             axi_rdata_int <= std_logic_vector(axi_reg_hist(addr_index-4));
+                        elsif addr_index = (4 + N_HISTOGRAMS) then
+                            axi_rdata_int <= axi_reg_minmax;
                         else
                             axi_rdata_int <= x"DEADBEEF";
                         end if;

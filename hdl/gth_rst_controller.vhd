@@ -45,6 +45,7 @@ use xpm.vcomponents.all;
 entity gth_rst_controller is
   port (
     clk                                 : in    std_logic;
+    gth_clk                                 : in    std_logic;
     rstn                                : in    std_logic;
     gtwiz_userclk_rx_reset           : out std_logic_vector(0 to 0);
     gtwiz_buffbypass_rx_reset        : out std_logic_vector(0 to 0);
@@ -108,8 +109,15 @@ signal reg_resets   : std_logic_vector(31 downto 0);
 signal reg_cdr_controls : std_logic_vector(31 downto 0);
 signal reg_gth_configs : std_logic_vector(31 downto 0);
 
+signal cdc_reg_resets   : std_logic_vector(5 downto 0);
+signal cdc_reg_cdr_controls : std_logic_vector(14 downto 0);
+signal cdc_reg_gth_configs : std_logic_vector(30 downto 0);
+
 signal reg_resets_status : std_logic_vector(31 downto 0);
 signal reg_status : std_logic_vector(31 downto 0);
+
+signal cdc_reg_resets_status : std_logic_vector(4 downto 0);
+signal cdc_reg_status : std_logic_vector(19 downto 0);
 
 signal axi_awready_int : std_logic := '0';
 signal axi_wready_int  : std_logic := '0';
@@ -123,31 +131,114 @@ signal axi_rresp_int   : std_logic_vector(1 downto 0) := (others => '0');
 
 begin
     
-    gtwiz_reset_all(0)                 <= reg_resets(0);                
-    gtwiz_reset_rx_pll_and_datapath(0) <= reg_resets(1);
-    gtwiz_reset_rx_datapath(0)         <= reg_resets(2);   
-    gtwiz_userclk_rx_reset(0)          <= reg_resets(3);         
-    gtwiz_buffbypass_rx_reset(0)       <= reg_resets(4);      
-    gtwiz_buffbypass_rx_start_user(0)  <= reg_resets(5);      
+    -- axi regs to gth
+    gtwiz_reset_all(0)                 <= cdc_reg_resets(0);                
+    gtwiz_reset_rx_pll_and_datapath(0) <= cdc_reg_resets(1);
+    gtwiz_reset_rx_datapath(0)         <= cdc_reg_resets(2);   
+    gtwiz_userclk_rx_reset(0)          <= cdc_reg_resets(3);         
+    gtwiz_buffbypass_rx_reset(0)       <= cdc_reg_resets(4);      
+    gtwiz_buffbypass_rx_start_user(0)  <= cdc_reg_resets(5);      
 
-    rxcdrhold   <=  reg_cdr_controls(6 downto 0);
-    rxcdrovrden <=  reg_cdr_controls(14 downto 8);
+    rxcdrhold   <=  cdc_reg_cdr_controls(6 downto 0);
+    rxcdrovrden <=  cdc_reg_cdr_controls(14 downto 8);
 
-    rxlpmen         <=  reg_gth_configs(6  downto 0);
-    rxlpmhfovrden   <=  reg_gth_configs(14 downto 8);
-    rxlpmlfklovrden <=  reg_gth_configs(22 downto 16);
-    rxosovrden      <=  reg_gth_configs(30 downto 24);
+    rxlpmen         <=  cdc_reg_gth_configs(6  downto 0);
+    rxlpmhfovrden   <=  cdc_reg_gth_configs(14 downto 8);
+    rxlpmlfklovrden <=  cdc_reg_gth_configs(22 downto 16);
+    rxosovrden      <=  cdc_reg_gth_configs(30 downto 24);
+    
+    -- cdc signals
+    xpm_cdc_reg_rst_gth : xpm_cdc_array_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1,
+        WIDTH => 6
+    )
+    port map (
+        src_clk  => clk,
+        src_in   => reg_resets(5 downto 0),
+        dest_clk => gth_clk,    
+        dest_out => cdc_reg_resets
+    );
+ 
+    xpm_cdc_reg_cdr_ctrl : xpm_cdc_array_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1,
+        WIDTH => 15
+    )
+    port map (
+        src_clk  => clk,
+        src_in   => reg_cdr_controls(14 downto 0),
+        dest_clk => gth_clk,    
+        dest_out => cdc_reg_cdr_controls
+    );
 
-    reg_resets_status(0) <= gtwiz_userclk_rx_active(0);   
-    reg_resets_status(1) <= gtwiz_buffbypass_rx_done(0);  
-    reg_resets_status(2) <= gtwiz_buffbypass_rx_error(0); 
-    reg_resets_status(3) <= gtwiz_reset_rx_cdr_stable(0); 
-    reg_resets_status(4) <= gtwiz_reset_rx_done(0);       
+    xpm_cdc_reg_gth_configs : xpm_cdc_array_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1,
+        WIDTH => 31
+    )
+    port map (
+        src_clk  => clk,
+        src_in   => reg_gth_configs(30 downto 0),
+        dest_clk => gth_clk,    
+        dest_out => cdc_reg_gth_configs
+    );   
+       
+    -- gth to axi regs
+    cdc_reg_resets_status(0) <= gtwiz_userclk_rx_active(0);   
+    cdc_reg_resets_status(1) <= gtwiz_buffbypass_rx_done(0);  
+    cdc_reg_resets_status(2) <= gtwiz_buffbypass_rx_error(0); 
+    --cdc_reg_resets_status(3) <= gtwiz_reset_rx_cdr_stable(0); -- this is on free running fpga clock
+    reg_resets_status(3) <= gtwiz_reset_rx_cdr_stable(0); -- this is on free running fpga clock
+    cdc_reg_resets_status(4) <= gtwiz_reset_rx_done(0);       
 
-    reg_status(6 downto 0) <= gtpowergood;       
-    reg_status(14 downto 8) <= rxpmaresetdone;   
-    reg_status(17 downto 16) <= qpll0lock;       
-    reg_status(19 downto 18) <= qpll0refclklost; 
+    cdc_reg_status(6 downto 0) <= gtpowergood;       
+    cdc_reg_status(14 downto 8) <= rxpmaresetdone;   
+    cdc_reg_status(17 downto 16) <= qpll0lock;       
+    cdc_reg_status(19 downto 18) <= qpll0refclklost; 
+    
+    -- CDC signals
+    xpm_cdc_reg_rst1 : xpm_cdc_array_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1,
+        WIDTH => 3
+    )
+    port map (
+        src_clk  => gth_clk,
+        src_in   => cdc_reg_resets_status(2 downto 0),
+        dest_clk => clk,    
+        dest_out => reg_resets_status(2 downto 0)
+    );
+
+    xpm_cdc_reg_rst2 : xpm_cdc_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1
+    )
+    port map (
+        src_clk  => gth_clk,
+        src_in   => cdc_reg_resets_status(4),
+        dest_clk => clk,    
+        dest_out => reg_resets_status(4)
+    );
+
+    xpm_cdc_reg_stat : xpm_cdc_array_single
+    generic map (
+        DEST_SYNC_FF => 2,
+        SRC_INPUT_REG => 1,
+        WIDTH => 20
+    )
+    port map (
+        src_clk  => gth_clk,
+        src_in   => cdc_reg_status(19 downto 0),
+        dest_clk => clk,  
+        dest_out => reg_status(19 downto 0)
+    );
+   
 
   -- 1) AXI4-Lite slave logic
     axifsm :process(clk)
