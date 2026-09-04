@@ -302,18 +302,19 @@ begin
         
     end process;
 
+-- control signals for min/max algorithm
     hist_status: process(gth_domain_clk)
     begin    
         if rising_edge(gth_domain_clk) then
             if rstn_cdc = '0' then
-               w_ch_hist_idle <= '1';
+               --w_ch_hist_idle <= '1';
                w_ch_hist_finished <= '0';
             else            
-                if (hist_state = IDLE) then
-                    w_ch_hist_idle <= '1';
-                else
-                    w_ch_hist_idle <= '0';
-                end if;               
+--                if (hist_state = IDLE) then
+--                    w_ch_hist_idle <= '1';
+--                else
+--                    w_ch_hist_idle <= '0';
+--                end if;               
                 if (hist_state = FINISH) then
                     w_ch_hist_finished <= '1';
                 else
@@ -323,7 +324,7 @@ begin
         end if;        
     end process;
     
-ch_hist_idle <= w_ch_hist_idle;
+ch_hist_idle <= (not gth_reg_cfg(0)); -- idle/reset == 0
 ch_hist_finished <= w_ch_hist_finished;
 
   -- 2) AXI4-Lite slave logic

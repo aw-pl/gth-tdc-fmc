@@ -1,22 +1,5 @@
-----------------------------------------------------------------------------------
--- Company: 
--- Engineer: 
--- 
--- Create Date: 08/23/2025 10:51:21 PM
--- Design Name: 
--- Module Name: gth_splitter_clk - Behavioral
--- Project Name: 
--- Target Devices: 
--- Tool Versions: 
--- Description: 
--- 
--- Dependencies: 
--- 
--- Revision:
--- Revision 0.01 - File Created
--- Additional Comments:
--- 
-----------------------------------------------------------------------------------
+-- Andrzej Wojenski, Warsaw University of Technology
+-- Updates to support one quad per IP for using LOC constraints
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
@@ -32,6 +15,8 @@ use UNISIM.VComponents.all;
 
 entity gth_splitter_clk is
     generic (
+        -- version for splitted GTH for fixing LOC placement
+        -- this nneds to be divided into lower number of ports to support quads
         TOTAL_WIDTH : integer := 560;
         NUM_OUTPUTS : integer := 7;
         SEGMENT_WIDTH : integer := 80
@@ -60,19 +45,50 @@ begin
         splitter_array(i) <= input_vector((i+1)*SEGMENT_WIDTH-1 downto i*SEGMENT_WIDTH);
     end generate;
     
+    -- TODO IDEAS
+    -- to obtain maybe more stability, for the first 2 regs (make extra) lets make a process with async regs
+    -- and those lets place by loc constraints next to GTH RX/CHx blocks
+    
+    -- how those 80bits are done in GTH component?
+    
+    -- what comes from a channel is directly:
+    -- rxctrl0 [15:0]
+    -- rxctrl1 [15:0]
+    -- rxdata [127:0]
+    
+    -- from other the same
+    -- rxctrl0 [15:0]
+    -- rxctrl1 [15:0]
+    -- rxdata [127:0]
+     
     regs_p: process(aclk)
     begin
         if rising_edge(aclk) then
             output_0 <= splitter_array(0);
             output_1 <= splitter_array(1);
             output_2 <= splitter_array(2);
-            output_3 <= splitter_array(3);
-            output_4 <= splitter_array(4);
-            output_5 <= splitter_array(5);
-            output_6 <= splitter_array(6);
+            if (NUM_OUTPUTS > 3) then
+                output_3 <= splitter_array(3);
+            else
+                output_3 <= (others => '0');
+            end if;
+            if (NUM_OUTPUTS > 4) then
+                output_4 <= splitter_array(4);
+            else
+                output_4 <= (others => '0');
+            end if;
+            if (NUM_OUTPUTS > 5) then
+                output_5 <= splitter_array(5);
+            else
+                output_5 <= (others => '0');
+            end if;
+            
+            if (NUM_OUTPUTS > 6) then
+                output_6 <= splitter_array(6);
+            else
+                output_6 <= (others => '0');
+            end if;
         end if;
     end process;
-        
-
     
 end Behavioral;

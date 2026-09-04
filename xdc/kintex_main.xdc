@@ -470,6 +470,15 @@ set_property PACKAGE_PIN B15 [get_ports {PLL_CTRL_tri_io[0]}]
 
 #create_clock -period 6.400 -name gth_clk_out -waveform {0.000 3.200} [get_pins {design_1_i/gth_wrapper_0/gtwiz_userclk_rx_usrclk2_out[0]}]
 
+
+create_pblock pblock_gth_splitter_clk_0
+add_cells_to_pblock [get_pblocks pblock_gth_splitter_clk_0] [get_cells -quiet [list design_1_i/gth_splitter_clk_0]]
+resize_pblock [get_pblocks pblock_gth_splitter_clk_0] -add {SLICE_X91Y120:SLICE_X100Y162}
+create_pblock pblock_gth_splitter_clk_1
+add_cells_to_pblock [get_pblocks pblock_gth_splitter_clk_1] [get_cells -quiet [list design_1_i/gth_splitter_clk_1]]
+resize_pblock [get_pblocks pblock_gth_splitter_clk_1] -add {SLICE_X91Y163:SLICE_X100Y209}
+
+
 set_property C_CLK_INPUT_FREQ_HZ 300000000 [get_debug_cores dbg_hub]
 set_property C_ENABLE_CLK_DIVIDER false [get_debug_cores dbg_hub]
 set_property C_USER_SCAN_CHAIN 1 [get_debug_cores dbg_hub]
